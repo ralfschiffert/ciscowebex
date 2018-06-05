@@ -1,0 +1,93 @@
+#!/bin/zsh
+
+
+if [[ -z "$1" ]] ; then
+	echo "Request token not provided. Please call command with request token as argument."
+	exit
+fi
+
+REQUEST_TOKEN=$1
+
+#that's the file we keep our webhooks with the URL and the index offset we have
+#the file should have the following entries
+#type viewID ID
+#example call-created 93u3k 5
+#the meaning would be the webhook name which is resource-event theUUIDforTheWebhookInbox mostRecentID displayed already
+if [[ -e webhookfile ]] {
+	rm webhookfile
+}
+
+#declares it as an associative array
+typeset -A whnametype
+#we set the targetURL as empty until we are ready to fill it in
+whnametype=("calls_created" "" "calls_updated" "" "callMemberships_created" "" "callMemberships_updated" "")
+
+
+#deletes ALL existing webhooks from account
+function deleteExistingWebhooks {
+  echo "I am about to delete all your account webhooks if you have any"
+  echo "You can press ^C to stop me"
+  sleep 5
+  #retrieve all the webhooks in the account
+  webhookids=("${(@f)$(curl -s -X GET https://api.ciscospark.com/webhooks -H "Authorization: Bearer ${REQUEST_TOKEN}" | jq '.items[]?.id' )}")
+
+  if [[ -n ${webhookids} ]]; then
+    #iterate over each webhook and delete it
+    for id in $webhookids; do
+    #quotes are a leftover artifact from the above parsing
+    curr=$(echo ${id} | sed 's/"//g')
+    echo "deleting webhookid ${curr}"
+    curl -s -X DELETE https://api.ciscospark.com/webhooks/${curr} -H "Authorization: Bearer ${REQUEST_TOKEN}"
+    done
+
+    echo "all account webhooks deleted"
+  fi
+}
+
+
+deleteExistingWebhooks
+
+
+#establish 4 new webbhokinboxes on webhookinboxcom
+#these are call-[create,update] and callMembership-[create,update]
+#the webhookinbox URL's look like the following
+#for the inbox
+#http://api.webhookinbox.com/i/UUID/in/
+#for retrieval
+#http://webhookinbox.com/view/UUID/
+#we are going to compose these
+for webhookname in ${(@k)whnametype}; do
+  inboxid=$(curl -s -X POST http://api.webhookinbox.com/create/ | jq '.base_url' | awk -F/ '{print $5}')
+  whnametype[${webhookname}]=http://api.webhookinbox.com/i/${inboxid}/in/
+  viewurl=http://webhookinbox.com/view/${inboxid}/
+  echo "see your webhook for ${webhookname} at ${viewurl}"
+  retrievalUrl=http://api.webhookinbox.com/i/${inboxid}/items/
+  identifier=(${webhookname} ${retrievalUrl} -1)
+  echo $identifier >> webhookfile
+done
+
+echo "check the file webhookfile for the 4 new inboxes"
+
+#let's now register these 4 webhook inboxes in the account portal
+for wh in ${(@k)whnametype}; do
+	name=${wh}
+	resource=$(echo ${wh} | awk -F_ '{print $1}')
+	event=$(echo ${wh} | awk -F_ '{print $2}')
+	targetUrl=${(P)wh}
+
+  if [[ ${wh} = "callMemberships_created" ]] {
+    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=notified\" }"
+  } elif [[ ${wh} = "callMemberships_updated" ]] {
+    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=left\" }"
+  } else {
+    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\"}"
+  }
+  echo $jsonObj
+
+  whidnew=$(curl -s -X POST https://api.ciscospark.com/webhooks/ -H "Authorization: Bearer ${REQUEST_TOKEN}" -H "Content-type: application/json" -d $jsonObj | jq '.id')
+  echo "registered webhook ${whidnew} for ${name} in your account"
+done
+
+
+
+

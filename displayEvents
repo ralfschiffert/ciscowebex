@@ -1,0 +1,34 @@
+#!/bin/zsh
+
+if [[ -z "$1" ]] ; then
+        echo "You need to select a resource: calls_created, calls_updated, callMemberships_created, callMemberships_updated"
+	echo "Just provide it after the command and only one of them"
+        exit
+fi
+
+
+# read the input from the webhookfile
+# the file contains webhookName - webhookUrl - id 
+# we want to read from the id onward so as to only check new entries
+while read i; do
+
+name=$(echo $i | awk '{print $1}')
+index=$(echo $i | awk '{print $3}')
+url=$(echo $i | awk '{print $2}')
+accessurl=${url}"?order=created&since=id:"${index}
+
+if [[ "$1" == "$name" ]] ; then
+	rawresponse=$(curl -s -X GET $accessurl)
+	id=$(echo $rawresponse | jq '.items[-1].id' | sed 's/"//g' )
+	(( id = $id + 1 ))
+	index=$id
+        response=$(echo $rawresponse | jq '.items[].body' | sed 's/^"//' | sed 's/"$//' | sed 's/\\//g' | jq '.')
+	echo $response
+fi
+identifier=(${name} ${url} ${index})
+echo $identifier >> webhookfilen
+done <webhookfile
+
+
+mv webhookfilen webhookfile
+
