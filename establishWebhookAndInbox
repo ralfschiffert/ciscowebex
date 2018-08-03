@@ -64,6 +64,8 @@ for webhookname in ${(@k)whnametype}; do
   retrievalUrl=http://api.webhookinbox.com/i/${inboxid}/items/
   identifier=(${webhookname} ${retrievalUrl} -1)
   echo $identifier >> webhookfile
+#let's launch the tabs with the URL
+ /usr/bin/open -a "/Applications/Google Chrome.app" ${viewurl}
 done
 
 echo "check the file webhookfile for the 4 new inboxes"
@@ -76,9 +78,9 @@ for wh in ${(@k)whnametype}; do
 	targetUrl=${(P)wh}
 
   if [[ ${wh} = "callMemberships_created" ]] {
-    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=notified\" }"
+    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=waiting\" }"
   } elif [[ ${wh} = "callMemberships_updated" ]] {
-    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=left\" }"
+    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=joined\" }"
   } else {
     jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\"}"
   }

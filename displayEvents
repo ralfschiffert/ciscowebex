@@ -7,6 +7,11 @@ if [[ -z "$1" ]] ; then
 fi
 
 
+if [[ -e webhookfilen ]] {
+        rm webhookfilen
+}
+
+
 # read the input from the webhookfile
 # the file contains webhookName - webhookUrl - id 
 # we want to read from the id onward so as to only check new entries
@@ -18,12 +23,16 @@ url=$(echo $i | awk '{print $2}')
 accessurl=${url}"?order=created&since=id:"${index}
 
 if [[ "$1" == "$name" ]] ; then
-	rawresponse=$(curl -s -X GET $accessurl)
+	rawresponse=$(curl -s -m 1 -X GET $accessurl)
 	id=$(echo $rawresponse | jq '.items[-1].id' | sed 's/"//g' )
-	(( id = $id + 1 ))
-	index=$id
-        response=$(echo $rawresponse | jq '.items[].body' | sed 's/^"//' | sed 's/"$//' | sed 's/\\//g' | jq '.')
-	echo $response
+	if [[ -z "$id" ]]; then
+		echo "no new results"
+	else
+		(( id = $id + 1 ))
+		index=$id
+       		 response=$(echo $rawresponse | jq '.items[].body' | sed 's/^"//' | sed 's/"$//' | sed 's/\\//g' | jq '.')
+	  	echo $response
+	fi
 fi
 identifier=(${name} ${url} ${index})
 echo $identifier >> webhookfilen
