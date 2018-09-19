@@ -22,15 +22,19 @@ index=$(echo $i | awk '{print $3}')
 url=$(echo $i | awk '{print $2}')
 accessurl=${url}"?order=created&since=id:"${index}
 
+
 if [[ "$1" == "$name" ]] ; then
+	echo "finding the right resource ${name}"
 	rawresponse=$(curl -s -m 1 -X GET $accessurl)
 	id=$(echo $rawresponse | jq '.items[-1].id' | sed 's/"//g' )
+	echo "id is ${id}"
 	if [[ -z "$id" ]]; then
 		echo "no new results"
 	else
-		(( id = $id + 1 ))
+#	(( id = $id + 1 ))
 		index=$id
-       		 response=$(echo $rawresponse | jq '.items[].body' | sed 's/^"//' | sed 's/"$//' | sed 's/\\//g' | jq '.')
+		echo "index is ${index}"
+       		response=$(echo $rawresponse | jq '.items[].body' | sed 's/^"//' | sed 's/"$//' | sed 's/\\//g' | jq '.')
 	  	echo $response
 	fi
 fi

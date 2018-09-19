@@ -25,10 +25,10 @@ whnametype=("calls_created" "" "calls_updated" "" "callMemberships_created" "" "
 
 #deletes ALL existing webhooks from account
 function deleteExistingWebhooks {
-  echo "I am about to delete all your account webhooks if you have any"
-  echo "You can press ^C to stop me"
-  sleep 5
-  #retrieve all the webhooks in the account
+   echo "\nI am about to delete all your account webhooks if you have any"
+#  echo "You can press ^C to stop me"
+#  sleep 5
+ #retrieve all the webhooks in the account
   webhookids=("${(@f)$(curl -s -X GET https://api.ciscospark.com/webhooks -H "Authorization: Bearer ${REQUEST_TOKEN}" | jq '.items[]?.id' )}")
 
   if [[ -n ${webhookids} ]]; then
@@ -45,7 +45,10 @@ function deleteExistingWebhooks {
 }
 
 
-deleteExistingWebhooks
+read -q "asw?Do you want to delete all existing account webhooks?"
+if [[ $asw = 'y' ]]; then
+	deleteExistingWebhooks
+fi
 
 
 #establish 4 new webbhokinboxes on webhookinboxcom
@@ -77,14 +80,8 @@ for wh in ${(@k)whnametype}; do
 	event=$(echo ${wh} | awk -F_ '{print $2}')
 	targetUrl=${(P)wh}
 
-  if [[ ${wh} = "callMemberships_created" ]] {
-    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=waiting\" }"
-  } elif [[ ${wh} = "callMemberships_updated" ]] {
-    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"filter\": \"status=joined\" }"
-  } else {
-    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\"}"
-  }
-  echo $jsonObj
+    jsonObj="{\"name\": \"${name}\", \"resource\": \"${resource}\", \"event\": \"${event}\", \"targetUrl\": \"${whnametype[${wh}]}\", \"ownedBy\": \"org\" }"
+    echo $jsonObj
 
   whidnew=$(curl -s -X POST https://api.ciscospark.com/webhooks/ -H "Authorization: Bearer ${REQUEST_TOKEN}" -H "Content-type: application/json" -d $jsonObj | jq '.id')
   echo "registered webhook ${whidnew} for ${name} in your account"

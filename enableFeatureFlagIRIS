@@ -3,6 +3,13 @@
 # sets the flags for the calls and callMembership API
 token=$1
 
+# check if base64 exists
+if ! type "base64" > /dev/null; then
+  echo "base64 is not installed or not accessible to this script"
+  echo "script won't work. exiting..."
+  exit
+fi
+
 #let's first unpack the user ID
 #userid=$(curl -s -X GET https://api.ciscospark.com/v1/people/me -H "Authorization: Bearer ${token}" | jq '.id' | sed 's/"//g')
 userid=$(curl -s -X GET https://api.ciscospark.com/v1/people/me -H "Authorization: Bearer ${token}" |awk -F: '{print $2}' | sed -e 's/","emails"//' | sed -e 's/"//') 
@@ -16,12 +23,26 @@ person=$(echo $userid[1,80] | base64 -D)
 person=$(echo $person | cut -d"/" -f5)
 
 #now set the flag
-featureflags=("calls-api" "call-membership-webhooks" "calls-api-docs" "calls-webhooks")
+featureflags=("calls-api" "call-membership-webhooks" "calls-api-docs" "calls-webhooks" "devices-places-api-docs" "org-webhooks")
 
 for fl in ${featureflags}; do 
 url=("https://feature-a.wbx2.com/feature/api/v1/features/users/${person}/developer")
 
 json=("{ \"key\":\"${fl}\", \"mutable\":true, \"val\":true }")
 
-$(curl -o outfile  -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json"  -d ${json} ${url})
+# the following relies on jq
+# if jq is not installed we blindly set the flag
+
+if ! type "jq" > /dev/null; then
+	$(curl -o outfile  -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json"  -d ${json} ${url})
+else
+	currentValue=$(curl -s -X GET ${url} -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" | jq --arg fl ${fl} '.featureToggles | .[] | select(.key==$fl) | .val' | sed -e s/\"//g)
+	echo "the current value for ${fl} is ${currentValue}"
+
+	if ! [[ "$currentValue" = true ]]; then
+		echo "setting it to true"
+     		$(curl -o outfile  -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json"  -d ${json} ${url})
+	fi
+fi 
+
 done
